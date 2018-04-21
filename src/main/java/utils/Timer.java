@@ -11,6 +11,7 @@ public class Timer {
 	}
 	
 	public void start() {
+		reset();
 		startTime = System.nanoTime();
 	}
 	

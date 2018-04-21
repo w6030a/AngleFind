@@ -14,174 +14,195 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import utils.Timer;
 
-// TODO: many names are not symbol in planet table
-// TODO: some planet has time in cell?
-/* example
-skipped:FT
-skipped:V
-skipped:K2
-skipped:K3
-skipped:LE 2017/8/7 MOON
-skipped:LE SUN
-skipped:SE 2017/8/21 MOON
-skipped:SE SUN
- */
 public class AngleFind {
 
-	private static ArrayList<Unit> unitTable = new ArrayList<Unit>();
-	private static final String fileName = "C:\\Users\\Peter\\Desktop\\fractal superfractal.xlsx";
-	//private static final String fileName = "C:\\Users\\Peter\\Desktop\\活頁簿1.xlsx";
+	private static final String fileName = "C:\\Users\\Peter\\Desktop\\test.xlsx";
 
+	private static final String ECLIPTIC_START_KEY = "EclipticStart".toUpperCase();
+	private static final String ECLIPTIC_END_KEY = "EclipticEnd".toUpperCase();
+	private static final String RIGHT_ASCENSION_START_KEY = "RAStart".toUpperCase();
+	private static final String RIGHT_ASCENSION_END_KEY = "RAEnd".toUpperCase();
+	
+	private static ArrayList<Unit> eclipticTable = new ArrayList<Unit>();
+	private static ArrayList<Unit> rightAscensionTable = new ArrayList<Unit>();
+
+	private static Timer timer = new Timer();
+
+	private static final Double PARTIAL_ANGLE_UNIT = 60.0;
+	private static final Long NANO_TO_MICRO_UNIT = 1000000L;
+	
 	public static void main(String[] args) {
-		// create table
-		Timer timer = new Timer();
-		timer.start();
 		
-		try {
-			File myFile = new File(fileName);
-			FileInputStream fis = new FileInputStream(myFile);
+		File myFile = new File(fileName);
+		
+		try(FileInputStream fis = new FileInputStream(myFile);
+			XSSFWorkbook myWorkBook = new XSSFWorkbook(fis);){
 			
-			// Finds the workbook instance for XLSX file
-			XSSFWorkbook myWorkBook = new XSSFWorkbook(fis);
+			// TODO: for each sheet
 			// Return first sheet from the XLSX workbook
 			XSSFSheet mySheet = myWorkBook.getSheetAt(0);
 			// Get iterator to all the rows in current sheet
 			Iterator<Row> rowIterator = mySheet.iterator();
 
-			// Skip title row
-			Row titleRow = rowIterator.next();
-			String planetName = "";
-			// Traversing over each row of XLSX file
-			while (rowIterator.hasNext()) {
-				try {
-					Row row = rowIterator.next();
-					
-					// For each row, iterate through each columns
-					Cell planet = row.getCell(0);
-					planetName = planet.toString().trim();
-					
-					// originalAngle
-					Cell originalAngle = row.getCell(1);
-					String[] parts = SignHelper.splitParts(originalAngle.getRichStringCellValue().toString().trim());
-					Sign sign = SignHelper.getSign(parts[1].toUpperCase());
-					double cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2]);
-					
-					Unit leadingUnit = new Unit();
-					Planet temp = PlanetTable.getPlanet(planetName);
-					leadingUnit.setPlanet(PlanetTable.getPlanet(planetName));
-					
-					if(temp == null) {
-						continue;
-					}
-					
-					leadingUnit.setPostFix("");
-					leadingUnit.setAngle(cellAngle);
-					
-					// F`
-					Cell firstPrime = row.getCell(1);
-					parts = SignHelper.splitParts(firstPrime.getRichStringCellValue().toString().trim());
-					sign = SignHelper.getSign(parts[1].toUpperCase());
-					cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2]);
-					
-					Unit firstUnit = new Unit();
-					firstUnit.setPlanet(PlanetTable.getPlanet(planetName)); 
-					firstUnit.setPostFix("`");
-					firstUnit.setAngle(cellAngle);
-					
-					// F``
-					Cell secondPrime = row.getCell(2);
-					parts = SignHelper.splitParts(secondPrime.getRichStringCellValue().toString().trim());
-					sign = SignHelper.getSign(parts[1].toUpperCase());
-					cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2]);
-					
-					Unit secondUnit = new Unit();
-					secondUnit.setPlanet(PlanetTable.getPlanet(planetName)); 
-					secondUnit.setPostFix("``");
-					secondUnit.setAngle(cellAngle);
-					
-					// F```
-					Cell thirdPrime = row.getCell(3);
-					parts = SignHelper.splitParts(thirdPrime.getRichStringCellValue().toString().trim());
-					sign = SignHelper.getSign(parts[1].toUpperCase());
-					cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2]);
-					
-					Unit thirdUnit = new Unit();
-					thirdUnit.setPlanet(PlanetTable.getPlanet(planetName)); 
-					thirdUnit.setPostFix("```");
-					thirdUnit.setAngle(cellAngle);
-					
-					// paralle angle
-					// TODO:
-					
-					// connect units
-					leadingUnit.setNext(firstUnit);
-					firstUnit.setNext(secondUnit);
-					secondUnit.setNext(thirdUnit);
-					
-					// construct table
-					unitTable.add(leadingUnit);
-					
-					Unit currentUnit = leadingUnit;
-					while(currentUnit != null) {
-						System.out.print(String.format("%s:%2f  ", currentUnit.getSymbol(), currentUnit.getAngle()));
-						currentUnit = currentUnit.getNext();
-					}
-					System.out.println("");
-					
-				} catch (Exception e) {
-					System.out.println("skipped:" + planetName);
-//					e.printStackTrace();					
-					continue;
-				}
-			}
+			/* create ecliptic table */
+			skipToRow(rowIterator, ECLIPTIC_START_KEY);
+			createTable(rowIterator, eclipticTable, ECLIPTIC_END_KEY);
 			
-			timer.stop();
-			System.out.println(String.format("Tabke Creation Took %d ms" , timer.getElapsedTime()/1000000L));
+			/* create right ascension table */
+			skipToRow(rowIterator, RIGHT_ASCENSION_START_KEY);
+			createTable(rowIterator, rightAscensionTable, RIGHT_ASCENSION_END_KEY);
 			
-			// calculate diff against whole table
-			timer.reset();
-			timer.start();
-			
-			for(Unit unit : unitTable) {
-				Unit currentUnit = unit;
-				while(currentUnit != null) {
-					//System.out.print(String.format("%s:%2f  ", currentUnit.getSymbol(), currentUnit.getAngle()));
-					
-					// TODO: compare to all other symbols
-					for(Unit innerUnit : unitTable) {
-						if(currentUnit.getPlanet().equals(innerUnit.getPlanet())) {
-							continue;
-						}
-						
-						Unit innerCurrentUnit = innerUnit;
-						while(innerCurrentUnit != null) {
-							double diff = Math.abs(currentUnit.getAngle() - innerCurrentUnit.getAngle());
-							
-							if(diff <= 1) {
-								System.out.println(String.format("The two angles have a diff less than 1: %s & %s", currentUnit.getSymbol(), innerUnit.getSymbol()));
-								System.out.println(String.format("Which are: %f & %f", currentUnit.getAngle(), innerUnit.getAngle()));
-							}
-							
-							innerCurrentUnit = innerCurrentUnit.getNext();
-						}
-					}
+			// calculate diff for ecliptic table
+			calculateInnerDiff(eclipticTable);
+			// calculate diff for right ascension table
+			calculateInnerDiff(rightAscensionTable);
 
-					// TODO: calculate time elapsed
-					currentUnit = currentUnit.getNext();
-				}
-			}
-
-			timer.stop();
-			System.out.println(String.format("Calculattion Took %d ms", timer.getElapsedTime()/1000000L));
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} finally {
-			
 		}
 	}
 
+	static void skipToRow(Iterator<Row> rowIterator, String key) {
+		String firstCellContent = "";
+		Row row = null;
+		while(rowIterator.hasNext() && !firstCellContent.equals(key)) {
+			row = rowIterator.next();
+			try {
+				firstCellContent = row.getCell(0).getRichStringCellValue().toString().trim().toUpperCase();
+			} catch (NullPointerException e) {
+				throw new RuntimeException("Error row = " + row.getCell(0));
+			}
+		}
+	}
+	
+	static void createTable(Iterator<Row> rowIterator, ArrayList<Unit> table, String terminationKey) {
+		timer.start();
+		
+		String planetName = "";
+		while (rowIterator.hasNext()) {
+			try {
+				Row row = rowIterator.next();
+				
+				String firstCellContent = row.getCell(0).getRichStringCellValue().toString().trim().toUpperCase();
+				if(firstCellContent.equals(terminationKey)) {
+					break;
+				}
+				
+				Cell planet = row.getCell(0);
+				planetName = planet.getRichStringCellValue().toString().trim();
+				
+				// originalAngle - N
+				Cell originalAngle = row.getCell(1);
+				String[] parts = SignHelper.splitParts(originalAngle.toString().trim());
+				Sign sign = SignHelper.getSign(parts[1].toUpperCase());
+				double cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2])/PARTIAL_ANGLE_UNIT;
+				
+				Unit firstUnit = new Unit();
+				Planet temp = PlanetTable.getPlanet(planetName);
+				
+				if(temp == null) {
+					PlanetTable.getPlanets().put(planetName, new Planet(planetName));
+				}
+				
+				firstUnit.setPlanet(PlanetTable.getPlanet(planetName));
+				firstUnit.setPostFix("");
+				firstUnit.setAngle(cellAngle);
+				
+				// F`
+				Cell firstPrime = row.getCell(2);
+				parts = SignHelper.splitParts(firstPrime.getRichStringCellValue().toString().trim());
+				sign = SignHelper.getSign(parts[1].toUpperCase());
+				cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2])/PARTIAL_ANGLE_UNIT;
+				
+				Unit secondUnit = new Unit();
+				secondUnit.setPlanet(PlanetTable.getPlanet(planetName)); 
+				secondUnit.setPostFix("`");
+				secondUnit.setAngle(cellAngle);
+				
+				// F``
+				Cell secondPrime = row.getCell(3);
+				parts = SignHelper.splitParts(secondPrime.getRichStringCellValue().toString().trim());
+				sign = SignHelper.getSign(parts[1].toUpperCase());
+				cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2])/PARTIAL_ANGLE_UNIT;
+				
+				Unit thirdUnit = new Unit();
+				thirdUnit.setPlanet(PlanetTable.getPlanet(planetName)); 
+				thirdUnit.setPostFix("``");
+				thirdUnit.setAngle(cellAngle);
+				
+				// F```
+				Cell thirdPrime = row.getCell(4);
+				parts = SignHelper.splitParts(thirdPrime.getRichStringCellValue().toString().trim());
+				sign = SignHelper.getSign(parts[1].toUpperCase());
+				cellAngle = sign.getAngle() + Double.parseDouble(parts[0]) + Double.parseDouble(parts[2])/PARTIAL_ANGLE_UNIT;
+				
+				Unit fourthUnit = new Unit();
+				fourthUnit.setPlanet(PlanetTable.getPlanet(planetName)); 
+				fourthUnit.setPostFix("```");
+				fourthUnit.setAngle(cellAngle);
+				
+				// paralle angle
+				// TODO:
+				
+				// connect units
+				firstUnit.setNext(secondUnit);
+				secondUnit.setNext(thirdUnit);
+				thirdUnit.setNext(fourthUnit);
+				
+				// construct table
+				table.add(firstUnit);
+				
+				Unit currentUnit = firstUnit;
+				while(currentUnit != null) {
+					System.out.print(String.format("%s:%.3f  ", currentUnit.getSymbol(), currentUnit.getAngle()));
+					currentUnit = currentUnit.getNext();
+				}
+				System.out.println("");
+				
+			} catch (Exception e) {
+				System.out.println("skipped:" + planetName + "due to error");
+				e.printStackTrace();
+				continue;
+			}
+		}
+		
+		timer.stop();
+		System.out.println(String.format("Ecliptic Table Creation Took %d ms" , timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
+	}
+
+	static void calculateInnerDiff(ArrayList<Unit> table) {
+		timer.start();
+		
+		for(Unit unit : table) {
+			Unit currentUnit = unit;
+			while(currentUnit != null) {
+				for(Unit innerUnit : table) {
+					if(currentUnit.getPlanet().equals(innerUnit.getPlanet())) {
+						continue;
+					}
+					
+					Unit innerCurrentUnit = innerUnit;
+					while(innerCurrentUnit != null) {
+						double diff = Math.abs(currentUnit.getAngle() - innerCurrentUnit.getAngle());
+						
+						if(diff <= 1) {
+							System.out.println(String.format("The two angles have a diff less than 1: %s & %s", currentUnit.getSymbol(), innerCurrentUnit.getSymbol()));
+							System.out.println(String.format("Which are: %.3f & %.3f", currentUnit.getAngle(), innerCurrentUnit.getAngle()));
+						}
+						
+						// TODO: more angles
+						
+						innerCurrentUnit = innerCurrentUnit.getNext();
+					}
+				}
+
+				currentUnit = currentUnit.getNext();
+			}
+		}
+		
+		timer.stop();
+		System.out.println(String.format("Calculattion Took %d ms", timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
+	}
 }
