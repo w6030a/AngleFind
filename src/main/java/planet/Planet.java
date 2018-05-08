@@ -1,4 +1,4 @@
-package angle.find;
+package planet;
 
 public class Planet {
 

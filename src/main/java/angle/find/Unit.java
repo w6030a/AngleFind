@@ -1,5 +1,7 @@
 package angle.find;
 
+import planet.Planet;
+
 public class Unit {
 
 	private Planet planet;

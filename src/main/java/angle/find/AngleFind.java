@@ -12,11 +12,17 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import aspect.AspectHelper;
+import aspect.AspectWarehouse;
+import planet.Planet;
+import planet.PlanetTable;
+import sign.Sign;
+import sign.SignHelper;
 import utils.Timer;
 
 public class AngleFind {
 
-	private static final String fileName = "C:\\Users\\Peter\\Desktop\\test.xlsx";
+	//private static final String fileName = "C:\\Users\\pc\\Desktop\\solarExcel\\test.xlsx";
 
 	private static final String ECLIPTIC_START_KEY = "EclipticStart".toUpperCase();
 	private static final String ECLIPTIC_END_KEY = "EclipticEnd".toUpperCase();
@@ -33,6 +39,7 @@ public class AngleFind {
 	
 	public static void main(String[] args) {
 		
+		String fileName = args[0];
 		File myFile = new File(fileName);
 		
 		try(FileInputStream fis = new FileInputStream(myFile);
@@ -57,6 +64,7 @@ public class AngleFind {
 			// calculate diff for right ascension table
 			calculateInnerDiff(rightAscensionTable);
 
+			printAspectWarehouse();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -176,33 +184,54 @@ public class AngleFind {
 		timer.start();
 		
 		for(Unit unit : table) {
-			Unit currentUnit = unit;
-			while(currentUnit != null) {
-				for(Unit innerUnit : table) {
-					if(currentUnit.getPlanet().equals(innerUnit.getPlanet())) {
+			Unit firstUnit = unit;
+			while(firstUnit != null) {
+				for(Unit secondUnit : table) {
+					if(firstUnit.getPlanet().equals(secondUnit.getPlanet())) {
 						continue;
 					}
 					
-					Unit innerCurrentUnit = innerUnit;
-					while(innerCurrentUnit != null) {
-						double diff = Math.abs(currentUnit.getAngle() - innerCurrentUnit.getAngle());
+					Unit current = secondUnit;
+					while(current != null) {
+						double diffToAngle = Math.abs(firstUnit.getAngle() - current.getAngle());
 						
-						if(diff <= 1) {
-							System.out.println(String.format("The two angles have a diff less than 1: %s & %s", currentUnit.getSymbol(), innerCurrentUnit.getSymbol()));
-							System.out.println(String.format("Which are: %.3f & %.3f", currentUnit.getAngle(), innerCurrentUnit.getAngle()));
+						for(AspectHelper.AspectType aspectType : AspectHelper.AspectType.values()) {
+							double diffToAspect = diffToAngle - aspectType.getAngle();
+							
+							if(Math.abs(diffToAspect) <= 1) {
+								String planet = firstUnit.getPlanet().getName();
+								String aspect = aspectType.name();
+								Angle angle = new Angle(Math.abs(diffToAspect), firstUnit.getSymbol(), current.getSymbol());
+								AspectWarehouse.add(planet, aspect, angle);
+							}
 						}
 						
-						// TODO: more angles
-						
-						innerCurrentUnit = innerCurrentUnit.getNext();
+						current = current.getNext();
 					}
 				}
 
-				currentUnit = currentUnit.getNext();
+				firstUnit = firstUnit.getNext();
 			}
 		}
 		
 		timer.stop();
-		System.out.println(String.format("Calculattion Took %d ms", timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
+		System.out.println(String.format("Calculation Took %d ms", timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
+	}
+
+	private static void printAspectWarehouse() {
+		timer.start();
+		
+		for(String planet : AspectWarehouse.getPlanetTypes()) {
+			System.out.println(String.format("Planet: [%s]", planet));
+			for(String aspect : AspectWarehouse.getAspectTypes(planet)) {
+				System.out.println(String.format("\tAspect: [%s]", aspect));
+				for(Angle angle : AspectWarehouse.getSortedAspectsByPlanetAndAspectName(planet, aspect)) {
+					System.out.println(String.format("\t\tThe two planets : [%s & %s] have a angle: [%.3f]", angle.getFirstSymbol(), angle.getSecondSymbol(), angle.getDegree()));
+				}
+			}
+		}
+		
+		timer.stop();
+		System.out.println(String.format("Print Aspects Took %d ms", timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
 	}
 }

@@ -1,4 +1,4 @@
-package angle.find;
+package planet;
 
 import java.util.HashMap;
 

@@ -1,26 +1,44 @@
 package angle.find;
 
-public class Angle {
- 
-	public static enum Type{
-		Zero, Thirty, Fourty, Sixty, SeventyTwo,
-		Ninty, OneTwenty, OneThirtyFive, OneFourtyFour,
-		OneFifty, OneEighty,
-		
-		TwoTen, TwoFourty, TwoSeventy, ThreeHundred,
-		ThreeSixty,
-	}
-	
-	double angle;
+public class Angle implements Comparable<Angle>{
 
-	public Angle(double angle) {
-		this.angle = angle;
+	private double degree;
+	private String firstSymbol;
+	private String secondSymbol;
+
+	public Angle(double degree, String firstSymbol, String secondSymbol) {
+		super();
+		this.degree = degree;
+		this.firstSymbol = firstSymbol;
+		this.secondSymbol = secondSymbol;
 	}
-	
-	public double getAngle() {
-		return angle;
+
+	public double getDegree() {
+		return degree;
 	}
-	public void setAngle(double angle) {
-		this.angle = angle;
+
+	public void setDegree(double degree) {
+		this.degree = degree;
+	}
+
+	public String getFirstSymbol() {
+		return firstSymbol;
+	}
+
+	public void setFirstSymbol(String firstSymbol) {
+		this.firstSymbol = firstSymbol;
+	}
+
+	public String getSecondSymbol() {
+		return secondSymbol;
+	}
+
+	public void setSecondSymbol(String secondSymbol) {
+		this.secondSymbol = secondSymbol;
+	}
+
+	@Override
+	public int compareTo(Angle anotherAngle) {
+		return Double.compare(this.getDegree(), anotherAngle.getDegree());
 	}
 }
