@@ -1,9 +1,14 @@
 package angle.find;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -12,6 +17,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import aspect.Aspect;
 import aspect.AspectHelper;
 import aspect.AspectWarehouse;
 import planet.Planet;
@@ -39,8 +45,9 @@ public class AngleFind {
 	
 	public static void main(String[] args) {
 		
-		String fileName = args[0];
-		File myFile = new File(fileName);
+		String inputFilePath = args[0];
+		String outputFilePath = args[1];
+		File myFile = new File(inputFilePath);
 		
 		try(FileInputStream fis = new FileInputStream(myFile);
 			XSSFWorkbook myWorkBook = new XSSFWorkbook(fis);){
@@ -64,7 +71,8 @@ public class AngleFind {
 			// calculate diff for right ascension table
 			calculateInnerDiff(rightAscensionTable);
 
-			printAspectWarehouse();
+			//printAspectWarehouse();
+			writeAspectWarehouse(outputFilePath);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -195,12 +203,12 @@ public class AngleFind {
 					while(current != null) {
 						double diffToAngle = Math.abs(firstUnit.getAngle() - current.getAngle());
 						
-						for(AspectHelper.AspectType aspectType : AspectHelper.AspectType.values()) {
+						for(Aspect aspectType : AspectHelper.getAspects()) {
 							double diffToAspect = diffToAngle - aspectType.getAngle();
 							
 							if(Math.abs(diffToAspect) <= 1) {
 								String planet = firstUnit.getPlanet().getName();
-								String aspect = aspectType.name();
+								String aspect = String.format("%s - %d", aspectType.getName(), (int)aspectType.getAngle());
 								Angle angle = new Angle(Math.abs(diffToAspect), firstUnit.getSymbol(), current.getSymbol());
 								AspectWarehouse.add(planet, aspect, angle);
 							}
@@ -221,9 +229,9 @@ public class AngleFind {
 	private static void printAspectWarehouse() {
 		timer.start();
 		
-		for(String planet : AspectWarehouse.getPlanetTypes()) {
+		for(String planet : AspectWarehouse.getSortedPlanetTypes()) {
 			System.out.println(String.format("Planet: [%s]", planet));
-			for(String aspect : AspectWarehouse.getAspectTypes(planet)) {
+			for(String aspect : AspectWarehouse.getSortedAspectTypes(planet)) {
 				System.out.println(String.format("\tAspect: [%s]", aspect));
 				for(Angle angle : AspectWarehouse.getSortedAspectsByPlanetAndAspectName(planet, aspect)) {
 					System.out.println(String.format("\t\tThe two planets : [%s & %s] have a angle: [%.3f]", angle.getFirstSymbol(), angle.getSecondSymbol(), angle.getDegree()));
@@ -233,5 +241,28 @@ public class AngleFind {
 		
 		timer.stop();
 		System.out.println(String.format("Print Aspects Took %d ms", timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
+	}
+	
+	private static void writeAspectWarehouse(String outPath) {
+		timer.start();
+		
+		Path logFile = Paths.get(outPath);
+		try (BufferedWriter writer = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8)) {
+		    for(String planet : AspectWarehouse.getSortedPlanetTypes()) {
+		    	writer.write(String.format("Planet: [%s]\n", planet));
+				for(String aspect : AspectWarehouse.getSortedAspectTypes(planet)) {
+					writer.write(String.format("\tAspect: [%s]\n", aspect));
+					for(Angle angle : AspectWarehouse.getSortedAspectsByPlanetAndAspectName(planet, aspect)) {
+						writer.write(String.format("\t\tThe two planets : [%s & %s] have a angle: [%.3f]\n", angle.getFirstSymbol(), angle.getSecondSymbol(), angle.getDegree()));
+					}
+				}
+				writer.write(String.format("\n"));
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		timer.stop();
+		System.out.println(String.format("Write Aspects Took %d ms", timer.getElapsedTime()/NANO_TO_MICRO_UNIT));
 	}
 }

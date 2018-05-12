@@ -1,6 +1,8 @@
 package aspect;
 
-public class Aspect {
+import java.util.Comparator;
+
+public class Aspect implements Comparator<Aspect>, Comparable<Aspect>{
 	
 	private String name;
 	private String symbol;
@@ -28,5 +30,15 @@ public class Aspect {
 	}
 	public void setAngle(double angle) {
 		this.angle = angle;
+	}
+	
+	@Override
+	public int compareTo(Aspect anotherAspect) {
+		return Double.compare(this.getAngle(), anotherAspect.getAngle());
+	}
+
+	@Override
+	public int compare(Aspect a1, Aspect a2) {
+		return Double.compare(a1.getAngle(), a2.getAngle());
 	}
 }
